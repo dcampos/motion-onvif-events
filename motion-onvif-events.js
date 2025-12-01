@@ -11,14 +11,18 @@ async function start(args) {
 
   try {
     const configContent = fs.readFileSync(args.config_file, 'utf-8');
-    camerasConfig = JSON.parse(configContent);
+    config = JSON.parse(configContent);
+    camerasConfig = config.cameras || [];
   } catch (err) {
     console.error(`[ERROR] Unable to read or parse config file at ${args.config_file}:`, err.message);
     process.exit(1);
   }
 
-  for (const camConfig of camerasConfig) {
-    const motion = new Motion({ base: args.motion_base_url, camId: camConfig.motionCameraId });
+  const cameraPromises = camerasConfig.map(async (camConfig) => {
+    const motion = new Motion({
+      base: args.motion_base_url,
+      camId: camConfig.motionCameraId,
+    });
 
     const camera = await Camera.create(
       {
@@ -32,8 +36,14 @@ async function start(args) {
     );
 
     camera.addEventListener();
-  }
+    return camera;
+  });
+
+  await Promise.all(cameraPromises);
+
+  console.log('Motion ONVIF Events Bridge started successfully.');
 }
+
 
 function main() {
   const parser = new ArgumentParser({
